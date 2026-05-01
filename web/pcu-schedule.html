@@ -219,7 +219,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-</head>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script></head>
 <body>
 <div id="app">
 
@@ -584,6 +585,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// ═══ FIREBASE CONFIG ═══
+const firebaseConfig = {
+  apiKey: "AIzaSyDRolqP_PJwhFU8lmU22D_tzps0mbqu2fc",
+  authDomain: "pcu-schedule-v1.firebaseapp.com",
+  databaseURL: "https://pcu-schedule-v1-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pcu-schedule-v1",
+  storageBucket: "pcu-schedule-v1.firebasestorage.app",
+  messagingSenderId: "719742561590",
+  appId: "1:719742561590:web:18090f85ac19ad9c479797"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
 function save() {
   db.ref('pcu/registrations').set(registrations);
   db.ref('pcu/schedules').set(schedules);
@@ -602,6 +616,7 @@ function load() {
     renderStaffTable();
     buildViewTabs();
     buildHistView();
+    buildPickGrid();
   });
 }
 
