@@ -1,0 +1,5 @@
+{
+  "name": "pcu-web",
+  "scripts": { "start": "npx serve . -p $PORT" },
+  "dependencies": { "serve": "^14" }
+}
