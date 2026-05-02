@@ -205,11 +205,8 @@ async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg)
     return ConversationHandler.END
 
-# ═══ /lichtoi ═══
 async def lichtoi(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👤 Bạn là ai? Nhập tên của bạn:"
-    )
+    await update.message.reply_text("👤 Bạn là ai? Nhập tên của bạn:")
     return CHON_TEN
 
 async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -219,61 +216,34 @@ async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Không tìm thấy '{ten}'.")
         return ConversationHandler.END
 
-    reg = db.reference(f"pcu/registrations/{staff['id']}").get() or {}
-    if not reg:
-        await update.message.reply_text(f"📭 {staff['name']} chưa đăng ký ca nào.")
-        return ConversationHandler.END
+    await update.message.reply_text("⏳ Đang tải lịch của bạn...")
+    try:
+        key = os.environ.get("SCREENSHOT_KEY")
+        web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html"
 
-    msg = f"📅 Ca đã đăng ký ({staff['name']}):\n\n"
-    for key, shifts in sorted(reg.items()):
-        parts = key.split('_')
-        dk = parts[0].upper()
-        date = '_'.join(parts[1:])
-        try:
-            d = datetime.strptime(date, '%Y-%m-%d')
-            date_str = d.strftime('%d/%m/%Y')
-        except:
-            date_str = date
-        msg += f"📆 {date_str} [{dk}]: {', '.join(shifts)}\n"
-
-    await update.message.reply_text(msg)
-    return ConversationHandler.END
-
-# ═══ /lichchung ═══
-async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    mon = get_monday()
-    wn  = get_week_num(mon)
-    wk  = f"W{wn}"
-
-    sched = db.reference(f"pcu/schedules/{wk}").get()
-    if not sched:
-        await update.message.reply_text(
-            f"📭 Tuần {wk} chưa có lịch chính thức."
+        api_url = (
+            f"https://api.screenshotone.com/take"
+            f"?access_key={key}"
+            f"&url={web_url}"
+            f"&viewport_width=1400"
+            f"&viewport_height=900"
+            f"&full_page=false"
+            f"&format=jpg"
+            f"&image_quality=80"
+            f"&delay=4"
         )
-        return
 
-    msg = f"📋 Lịch trực {wk}:\n\n"
-    for date_str, day_data in sorted(sched.items()):
-        try:
-            d = datetime.strptime(date_str, '%Y-%m-%d')
-            msg += f"📆 {d.strftime('%d/%m (%a)')}\n"
-        except:
-            msg += f"📆 {date_str}\n"
+        import urllib.request
+        from io import BytesIO
+        img_data = urllib.request.urlopen(api_url).read()
+        await update.message.reply_photo(
+            photo=BytesIO(img_data),
+            caption=f"📅 Lịch đăng ký ca của {staff['name']}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
 
-        xld = day_data.get('xld', {}) or {}
-        for sn, names in xld.items():
-            if names:
-                ft = [n for n in names if n not in ['Vinh','MinhPK','VanNK']]
-                if ft:
-                    msg += f"  XLĐ {sn}: {', '.join(ft)}\n"
-
-        gc = day_data.get('gc', {}) or {}
-        for sn, names in gc.items():
-            if names:
-                msg += f"  GC {sn}: {', '.join(names)}\n"
-        msg += "\n"
-
-    await update.message.reply_text(msg[:4000])
+    return ConversationHandler.END
 
 # ═══ /huydangky ═══
 async def huydangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
