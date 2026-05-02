@@ -219,7 +219,7 @@ async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Đang tải lịch của bạn...")
     try:
         key = os.environ.get("SCREENSHOT_KEY")
-        web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html"
+        web_url = f"https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html?page=register&staff={staff['id']}"
 
         api_url = (
             f"https://api.screenshotone.com/take"
@@ -270,7 +270,7 @@ async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Đang tải lịch trực...")
     try:
         key = os.environ.get("SCREENSHOT_KEY")
-        web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html"
+web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html?page=view-schedule"
         api_url = (
             f"https://api.screenshotone.com/take"
             f"?access_key={key}"
@@ -280,7 +280,7 @@ async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"&full_page=false"
             f"&format=jpg"
             f"&image_quality=80"
-            f"&delay=3"
+            f"&delay=5"
         )
         import urllib.request
         from io import BytesIO
