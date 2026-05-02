@@ -458,7 +458,12 @@ function getMon(d){var dt=new Date(d);dt.setHours(0,0,0,0);var day=dt.getDay();d
 function wkDates(mon){var r=[];for(var i=0;i<7;i++){var d=new Date(mon);d.setDate(d.getDate()+i);r.push(d);}return r;}
 function fmtS(d){return d.getDate()+'/'+(d.getMonth()+1);}
 function fmtF(d){return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();}
-function iso(d){return d.toISOString().split('T')[0];}
+function iso(d){
+  var y=d.getFullYear();
+  var m=String(d.getMonth()+1).padStart(2,'0');
+  var day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function isToday(d){return iso(d)===iso(today);}
 function dowIdx(d){var day=d.getDay();return day===0?6:day-1;}
 var curMon = getMon(today);
