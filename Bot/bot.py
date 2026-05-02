@@ -59,7 +59,7 @@ def chup_anh(web_url):
         f"&full_page=false"
         f"&format=jpg"
         f"&image_quality=80"
-        f"&delay=5"
+        f"&delay=8"
     )
     return urllib.request.urlopen(api_url).read()
 
