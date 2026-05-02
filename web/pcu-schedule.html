@@ -975,12 +975,10 @@ var urlParams=new URLSearchParams(window.location.search);
 var pageParam=urlParams.get('page');
 var staffParam=urlParams.get('staff');
 if(pageParam){
-  setTimeout(function(){
-    go(pageParam);
-    if(staffParam && pageParam==='register'){
-      setTimeout(function(){pickStaff(staffParam);},800);
-    }
-  },2500);
+  go(pageParam);
+  if(staffParam && pageParam==='register'){
+    setTimeout(function(){pickStaff(staffParam);},300);
+  }
 }
 </script>
 </body>
