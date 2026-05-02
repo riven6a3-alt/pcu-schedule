@@ -606,7 +606,9 @@ function restoreRegBtns(){
   var reg=registrations[regStaffId]; if(!reg) return;
   Object.entries(reg).forEach(function(e){
     var rk=e[0], shifts=e[1];
-    var parts=rk.split('_'), dk=parts[0], date=parts.slice(1).join('_');
+    var under = rk.indexOf('_');
+var dk = rk.substring(0, under);
+var date = rk.substring(under + 1);
     shifts.forEach(function(sn){
       var btn=document.getElementById('rb_'+dk+'_'+date+'_'+sn.replace(/ /g,'_'));
       if(btn) btn.classList.add('selected');
