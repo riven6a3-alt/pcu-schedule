@@ -19,7 +19,6 @@ logging.basicConfig(level=logging.INFO)
 XLD_SHIFTS = {'1':'Ca 1','2':'Ca 2','3':'Ca 3','4':'Ca 4'}
 GC_SHIFTS  = {'s':'Ca sáng','t':'Ca tối'}
 
-# Conversation states
 CHON_TEN, NHAP_CA = range(2)
 
 def get_week_num(d):
@@ -48,6 +47,22 @@ def find_staff_by_name(name):
             return s
     return None
 
+def chup_anh(web_url):
+    import urllib.request
+    key = os.environ.get("SCREENSHOT_KEY")
+    api_url = (
+        f"https://api.screenshotone.com/take"
+        f"?access_key={key}"
+        f"&url={web_url}"
+        f"&viewport_width=1400"
+        f"&viewport_height=900"
+        f"&full_page=false"
+        f"&format=jpg"
+        f"&image_quality=80"
+        f"&delay=5"
+    )
+    return urllib.request.urlopen(api_url).read()
+
 # ═══ /start ═══
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -59,16 +74,14 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/huydangky — Hủy toàn bộ đăng ký"
     )
 
-# ═══ /dangky — Bước 1: hỏi tên ═══
+# ═══ /dangky ═══
 async def dangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     staff_list = get_all_staff()
     if not staff_list:
         await update.message.reply_text("❌ Chưa có nhân sự nào trong hệ thống.")
         return ConversationHandler.END
 
-    # Tạo bàn phím tên nhân viên
     names = [s['name'] for s in staff_list if s.get('name')]
-    # Chia thành hàng 3 người
     keyboard = [names[i:i+3] for i in range(0, len(names), 3)]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
@@ -78,7 +91,6 @@ async def dangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
     return CHON_TEN
 
-# ═══ Bước 2: nhận tên → hỏi ca ═══
 async def nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ten = update.message.text.strip()
     staff = find_staff_by_name(ten)
@@ -104,7 +116,7 @@ async def nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg += "\n📝 Gửi ca rảnh theo định dạng:\n"
     msg += "`T2:1,3 T3:2 T5:1,2,3,4`\n\n"
 
-    if any(d in dept for d in ['xld','robux']):
+    if any(d in dept for d in ['xld', 'robux']):
         msg += "Số ca XLĐ/Robux:\n"
         msg += "  1 = Ca 1 (8–12h)\n"
         msg += "  2 = Ca 2 (12–16h)\n"
@@ -125,7 +137,6 @@ async def nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
     return NHAP_CA
 
-# ═══ Bước 3: nhận ca và lưu ═══
 async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text  = update.message.text.strip()
     staff = ctx.user_data.get('staff', {})
@@ -144,9 +155,7 @@ async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if ':' not in part:
                 continue
             day_str, shifts_str = part.split(':', 1)
-            if day_str == 'CN':
-                pass
-            else:
+            if day_str != 'CN':
                 day_str = day_str.capitalize()
             day_idx = day_map.get(day_str)
             if day_idx is None or day_idx >= len(week):
@@ -205,6 +214,7 @@ async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg)
     return ConversationHandler.END
 
+# ═══ /lichtoi ═══
 async def lichtoi(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👤 Bạn là ai? Nhập tên của bạn:")
     return CHON_TEN
@@ -218,24 +228,12 @@ async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⏳ Đang tải lịch của bạn...")
     try:
-        key = os.environ.get("SCREENSHOT_KEY")
-        web_url = f"https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html?page=register&staff={staff['id']}"
-
-        api_url = (
-            f"https://api.screenshotone.com/take"
-            f"?access_key={key}"
-            f"&url={web_url}"
-            f"&viewport_width=1400"
-            f"&viewport_height=900"
-            f"&full_page=false"
-            f"&format=jpg"
-            f"&image_quality=80"
-            f"&delay=4"
+        web_url = (
+            f"https://pcu-schedule-web-production.up.railway.app"
+            f"/pcu-schedule.html?page=register&staff={staff['id']}"
         )
-
-        import urllib.request
         from io import BytesIO
-        img_data = urllib.request.urlopen(api_url).read()
+        img_data = chup_anh(web_url)
         await update.message.reply_photo(
             photo=BytesIO(img_data),
             caption=f"📅 Lịch đăng ký ca của {staff['name']}"
@@ -244,6 +242,23 @@ async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Lỗi: {str(e)}")
 
     return ConversationHandler.END
+
+# ═══ /lichchung ═══
+async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Đang tải lịch trực...")
+    try:
+        web_url = (
+            "https://pcu-schedule-web-production.up.railway.app"
+            "/pcu-schedule.html?page=view-schedule"
+        )
+        from io import BytesIO
+        img_data = chup_anh(web_url)
+        await update.message.reply_photo(
+            photo=BytesIO(img_data),
+            caption="📋 Lịch trực tuần này"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
 
 # ═══ /huydangky ═══
 async def huydangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -266,36 +281,10 @@ async def cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Đã hủy.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
-async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Đang tải lịch trực...")
-    try:
-        key = os.environ.get("SCREENSHOT_KEY")
-web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html?page=view-schedule"
-        api_url = (
-            f"https://api.screenshotone.com/take"
-            f"?access_key={key}"
-            f"&url={web_url}"
-            f"&viewport_width=1400"
-            f"&viewport_height=900"
-            f"&full_page=false"
-            f"&format=jpg"
-            f"&image_quality=80"
-            f"&delay=5"
-        )
-        import urllib.request
-        from io import BytesIO
-        img_data = urllib.request.urlopen(api_url).read()
-        await update.message.reply_photo(
-            photo=BytesIO(img_data),
-            caption="📋 Lịch trực tuần này"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
 # ═══ MAIN ═══
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Conversation đăng ký
     conv_dangky = ConversationHandler(
         entry_points=[CommandHandler('dangky', dangky)],
         states={
@@ -305,7 +294,6 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # Conversation xem lịch cá nhân
     conv_lichtoi = ConversationHandler(
         entry_points=[CommandHandler('lichtoi', lichtoi)],
         states={
@@ -314,7 +302,6 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # Conversation hủy đăng ký
     conv_huy = ConversationHandler(
         entry_points=[CommandHandler('huydangky', huydangky)],
         states={
