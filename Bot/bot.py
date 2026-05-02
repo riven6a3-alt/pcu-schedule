@@ -266,6 +266,31 @@ async def cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Đã hủy.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
+async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Đang tải lịch trực...")
+    try:
+        key = os.environ.get("SCREENSHOT_KEY")
+        web_url = "https://pcu-schedule-web-production.up.railway.app/pcu-schedule.html"
+        api_url = (
+            f"https://api.screenshotone.com/take"
+            f"?access_key={key}"
+            f"&url={web_url}"
+            f"&viewport_width=1400"
+            f"&viewport_height=900"
+            f"&full_page=false"
+            f"&format=jpg"
+            f"&image_quality=80"
+            f"&delay=3"
+        )
+        import urllib.request
+        from io import BytesIO
+        img_data = urllib.request.urlopen(api_url).read()
+        await update.message.reply_photo(
+            photo=BytesIO(img_data),
+            caption="📋 Lịch trực tuần này"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
 # ═══ MAIN ═══
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
