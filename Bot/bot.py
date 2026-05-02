@@ -19,7 +19,9 @@ logging.basicConfig(level=logging.INFO)
 XLD_SHIFTS = {'1':'Ca 1','2':'Ca 2','3':'Ca 3','4':'Ca 4'}
 GC_SHIFTS  = {'s':'Ca sáng','t':'Ca tối'}
 
-CHON_TEN, NHAP_CA = range(2)
+# States
+CHON_TEN, CHON_TUAN, NHAP_CA = range(3)
+LICHTOI_TEN = 10
 
 def get_week_num(d):
     return d.isocalendar()[1]
@@ -41,15 +43,16 @@ def get_all_staff():
     return [s for s in data if isinstance(s, dict)]
 
 def find_staff_by_name(name):
-    staff_list = get_all_staff()
-    for s in staff_list:
+    for s in get_all_staff():
         if s.get('id','').lower() == name.lower() or s.get('name','').lower() == name.lower():
             return s
     return None
 
 def chup_anh(web_url):
     import urllib.request
-    key = os.environ.get("SCREENSHOT_KEY")
+    key = os.environ.get("SCREENSHOT_KEY", "")
+    if not key:
+        return None
     api_url = (
         f"https://api.screenshotone.com/take"
         f"?access_key={key}"
@@ -61,7 +64,10 @@ def chup_anh(web_url):
         f"&image_quality=80"
         f"&delay=8"
     )
-    return urllib.request.urlopen(api_url).read()
+    try:
+        return urllib.request.urlopen(api_url, timeout=30).read()
+    except:
+        return None
 
 # ═══ /start ═══
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -86,7 +92,7 @@ async def dangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
     await update.message.reply_text(
-        "👤 Bạn là ai? Chọn tên hoặc gõ tên của bạn:",
+        "👤 Bạn là ai? Chọn tên hoặc gõ tên:",
         reply_markup=reply_markup
     )
     return CHON_TEN
@@ -97,23 +103,56 @@ async def nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if not staff:
         await update.message.reply_text(
-            f"❌ Không tìm thấy '{ten}' trong hệ thống.\n"
-            "Thử lại hoặc nhắn Admin để được thêm vào.",
+            f"❌ Không tìm thấy '{ten}'.\nThử lại hoặc nhắn Admin.",
             reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
 
-    dept = staff.get('dept', [])
-    weeks = get_3_weeks()
+    ctx.user_data['staff'] = staff
 
-    msg = f"✅ Xin chào {staff['name']}!\n"
-    msg += f"Mảng: {', '.join(dept)}\n\n"
-    msg += "📅 3 tuần tới:\n"
+    # Hỏi chọn tuần
+    weeks = get_3_weeks()
+    week_labels = []
     for week in weeks:
         wn = get_week_num(week[0])
-        msg += f"  Tuần {wn}: {week[0].strftime('%d/%m')} → {week[6].strftime('%d/%m/%Y')}\n"
+        label = f"Tuần {wn} ({week[0].strftime('%d/%m')}–{week[6].strftime('%d/%m')})"
+        week_labels.append(label)
 
-    msg += "\n📝 Gửi ca rảnh theo định dạng:\n"
+    ctx.user_data['weeks_data'] = [
+        [d.strftime('%Y-%m-%d') for d in w] for w in weeks
+    ]
+    ctx.user_data['week_labels'] = week_labels
+
+    keyboard = [[w] for w in week_labels]
+    keyboard.append(["📅 Tất cả 3 tuần"])
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
+    await update.message.reply_text(
+        f"✅ Xin chào {staff['name']}!\n\nChọn tuần muốn đăng ký:",
+        reply_markup=reply_markup
+    )
+    return CHON_TUAN
+
+async def nhan_tuan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    chon = update.message.text.strip()
+    staff = ctx.user_data.get('staff', {})
+    weeks_data = ctx.user_data.get('weeks_data', [])
+    week_labels = ctx.user_data.get('week_labels', [])
+    dept = staff.get('dept', [])
+
+    # Xác định tuần nào được chọn
+    if chon == "📅 Tất cả 3 tuần":
+        selected_weeks = weeks_data
+        tuan_str = "3 tuần tới"
+    else:
+        idx = next((i for i, l in enumerate(week_labels) if l == chon), 0)
+        selected_weeks = [weeks_data[idx]]
+        tuan_str = chon
+
+    ctx.user_data['selected_weeks'] = selected_weeks
+
+    msg = f"📝 Đăng ký ca cho {staff['name']} — {tuan_str}\n\n"
+    msg += "Gửi ca rảnh theo định dạng:\n"
     msg += "`T2:1,3 T3:2 T5:1,2,3,4`\n\n"
 
     if any(d in dept for d in ['xld', 'robux']):
@@ -131,21 +170,17 @@ async def nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg += "Ví dụ: `T2:1,3 T4:2 T6:s`\n"
     msg += "Gõ /cancel để hủy"
 
-    ctx.user_data['staff'] = staff
-    ctx.user_data['weeks'] = [[d.strftime('%Y-%m-%d') for d in w] for w in weeks]
-
     await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
     return NHAP_CA
 
 async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text  = update.message.text.strip()
     staff = ctx.user_data.get('staff', {})
-    weeks = ctx.user_data.get('weeks', [])
+    selected_weeks = ctx.user_data.get('selected_weeks', [])
     dept  = staff.get('dept', [])
     sid   = staff.get('id', '')
 
     day_map = {'T2':0,'T3':1,'T4':2,'T5':3,'T6':4,'T7':5,'CN':6}
-    week = weeks[0] if weeks else []
 
     reg_data = {}
     saved = []
@@ -158,50 +193,45 @@ async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if day_str != 'CN':
                 day_str = day_str.capitalize()
             day_idx = day_map.get(day_str)
-            if day_idx is None or day_idx >= len(week):
+            if day_idx is None:
                 continue
-            date = week[day_idx]
 
-            for c in shifts_str.split(','):
-                c = c.strip().lower()
-                if c in ['1','2','3','4']:
-                    shift_name = XLD_SHIFTS[c]
-                    if 'xld' in dept:
-                        key = f"xld_{date}"
-                        if key not in reg_data:
-                            reg_data[key] = []
-                        if shift_name not in reg_data[key]:
-                            reg_data[key].append(shift_name)
-                            saved.append(f"{day_str} {shift_name} (XLĐ)")
-                    if 'robux' in dept:
-                        key = f"robux_{date}"
-                        if key not in reg_data:
-                            reg_data[key] = []
-                        if shift_name not in reg_data[key]:
-                            reg_data[key].append(shift_name)
-                            saved.append(f"{day_str} {shift_name} (Robux)")
-                elif c in ['s','t']:
-                    shift_name = GC_SHIFTS[c]
-                    if 'giftcard' in dept:
-                        key = f"gc_{date}"
-                        if key not in reg_data:
-                            reg_data[key] = []
-                        if shift_name not in reg_data[key]:
-                            reg_data[key].append(shift_name)
-                            saved.append(f"{day_str} {shift_name} (GC)")
+            # Lưu vào tất cả tuần được chọn
+            for week in selected_weeks:
+                if day_idx >= len(week):
+                    continue
+                date = week[day_idx]
+
+                for c in shifts_str.split(','):
+                    c = c.strip().lower()
+                    if c in ['1','2','3','4']:
+                        shift_name = XLD_SHIFTS[c]
+                        if 'xld' in dept:
+                            key = f"xld_{date}"
+                            if key not in reg_data: reg_data[key] = []
+                            if shift_name not in reg_data[key]:
+                                reg_data[key].append(shift_name)
+                                saved.append(f"{day_str} {shift_name} (XLĐ) [{date}]")
+                        if 'robux' in dept:
+                            key = f"robux_{date}"
+                            if key not in reg_data: reg_data[key] = []
+                            if shift_name not in reg_data[key]:
+                                reg_data[key].append(shift_name)
+                                saved.append(f"{day_str} {shift_name} (Robux) [{date}]")
+                    elif c in ['s','t']:
+                        shift_name = GC_SHIFTS[c]
+                        if 'giftcard' in dept:
+                            key = f"gc_{date}"
+                            if key not in reg_data: reg_data[key] = []
+                            if shift_name not in reg_data[key]:
+                                reg_data[key].append(shift_name)
+                                saved.append(f"{day_str} {shift_name} (GC) [{date}]")
     except Exception as e:
-        await update.message.reply_text(
-            "❌ Sai định dạng. Thử lại:\n`T2:1,3 T4:s`",
-            parse_mode='Markdown'
-        )
+        await update.message.reply_text("❌ Sai định dạng. Thử lại:\n`T2:1,3 T4:s`", parse_mode='Markdown')
         return NHAP_CA
 
     if not reg_data:
-        await update.message.reply_text(
-            "❌ Không nhận được ca nào hợp lệ.\n"
-            "Kiểm tra lại định dạng: `T2:1,3 T4:2`",
-            parse_mode='Markdown'
-        )
+        await update.message.reply_text("❌ Không nhận được ca nào. Kiểm tra định dạng: `T2:1,3`", parse_mode='Markdown')
         return NHAP_CA
 
     db.reference(f'pcu/registrations/{sid}').update(reg_data)
@@ -210,14 +240,13 @@ async def nhan_ca(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     for s in saved:
         msg += f"  • {s}\n"
     msg += "\nDùng /lichtoi để xem lại."
-
     await update.message.reply_text(msg)
     return ConversationHandler.END
 
 # ═══ /lichtoi ═══
 async def lichtoi(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👤 Bạn là ai? Nhập tên của bạn:")
-    return CHON_TEN
+    await update.message.reply_text("👤 Bạn là ai? Nhập tên:")
+    return LICHTOI_TEN
 
 async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ten = update.message.text.strip()
@@ -226,44 +255,100 @@ async def lichtoi_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Không tìm thấy '{ten}'.")
         return ConversationHandler.END
 
+    # Thử chụp ảnh trước
     await update.message.reply_text("⏳ Đang tải lịch của bạn...")
-    try:
-        web_url = (
-            f"https://pcu-schedule-web-production.up.railway.app"
-            f"/pcu-schedule.html?page=register&staff={staff['id']}"
-        )
+    web_url = (
+        f"https://pcu-schedule-web-production.up.railway.app"
+        f"/pcu-schedule.html#register#{staff['id']}"
+    )
+    img_data = chup_anh(web_url)
+
+    if img_data:
         from io import BytesIO
-        img_data = chup_anh(web_url)
         await update.message.reply_photo(
             photo=BytesIO(img_data),
             caption=f"📅 Lịch đăng ký ca của {staff['name']}"
         )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
+    else:
+        # Fallback: gửi text
+        reg = db.reference(f"pcu/registrations/{staff['id']}").get() or {}
+        if not reg:
+            await update.message.reply_text(f"📭 {staff['name']} chưa đăng ký ca nào.")
+            return ConversationHandler.END
+
+        msg = f"📅 Ca đã đăng ký ({staff['name']}):\n\n"
+        for key, shifts in sorted(reg.items()):
+            under = key.index('_')
+            dk = key[:under].upper()
+            date = key[under+1:]
+            try:
+                d = datetime.strptime(date, '%Y-%m-%d')
+                date_str = d.strftime('%d/%m/%Y')
+            except:
+                date_str = date
+            if isinstance(shifts, list):
+                msg += f"📆 {date_str} [{dk}]: {', '.join(shifts)}\n"
+            elif isinstance(shifts, dict):
+                msg += f"📆 {date_str} [{dk}]: {', '.join(shifts.values())}\n"
+        await update.message.reply_text(msg)
 
     return ConversationHandler.END
 
 # ═══ /lichchung ═══
 async def lichchung(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Đang tải lịch trực...")
-    try:
-        web_url = (
-            "https://pcu-schedule-web-production.up.railway.app"
-            "/pcu-schedule.html?page=view-schedule"
-        )
+
+    # Thử chụp ảnh
+    web_url = (
+        "https://pcu-schedule-web-production.up.railway.app"
+        "/pcu-schedule.html#view-schedule"
+    )
+    img_data = chup_anh(web_url)
+
+    if img_data:
         from io import BytesIO
-        img_data = chup_anh(web_url)
         await update.message.reply_photo(
             photo=BytesIO(img_data),
             caption="📋 Lịch trực tuần này"
         )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Lỗi: {str(e)}")
+    else:
+        # Fallback: gửi text
+        mon = get_monday()
+        wn = get_week_num(mon)
+        wk = f"W{wn}"
+
+        sched = db.reference(f"pcu/schedules/{wk}").get()
+        if not sched:
+            await update.message.reply_text(f"📭 Tuần {wk} chưa có lịch chính thức.")
+            return
+
+        msg = f"📋 Lịch trực {wk}:\n\n"
+        for date_str, day_data in sorted(sched.items()):
+            try:
+                d = datetime.strptime(date_str, '%Y-%m-%d')
+                msg += f"📆 {d.strftime('%d/%m (%a)')}\n"
+            except:
+                msg += f"📆 {date_str}\n"
+
+            xld = day_data.get('xld', {}) or {}
+            for sn, names in xld.items():
+                if isinstance(names, list) and names:
+                    ft = [n for n in names if n not in ['Vinh','MinhPK','VanNK']]
+                    if ft:
+                        msg += f"  XLĐ {sn}: {', '.join(ft)}\n"
+
+            gc = day_data.get('gc', {}) or {}
+            for sn, names in gc.items():
+                if isinstance(names, list) and names:
+                    msg += f"  GC {sn}: {', '.join(names)}\n"
+            msg += "\n"
+
+        await update.message.reply_text(msg[:4000])
 
 # ═══ /huydangky ═══
 async def huydangky(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👤 Nhập tên của bạn để hủy đăng ký:")
-    return CHON_TEN
+    await update.message.reply_text("👤 Nhập tên để hủy đăng ký:")
+    return LICHTOI_TEN
 
 async def huydangky_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ten = update.message.text.strip()
@@ -271,7 +356,6 @@ async def huydangky_nhan_ten(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not staff:
         await update.message.reply_text(f"❌ Không tìm thấy '{ten}'.")
         return ConversationHandler.END
-
     db.reference(f"pcu/registrations/{staff['id']}").delete()
     await update.message.reply_text(f"✅ Đã hủy toàn bộ đăng ký của {staff['name']}.")
     return ConversationHandler.END
@@ -288,8 +372,9 @@ def main():
     conv_dangky = ConversationHandler(
         entry_points=[CommandHandler('dangky', dangky)],
         states={
-            CHON_TEN: [MessageHandler(filters.TEXT & ~filters.COMMAND, nhan_ten)],
-            NHAP_CA:  [MessageHandler(filters.TEXT & ~filters.COMMAND, nhan_ca)],
+            CHON_TEN:  [MessageHandler(filters.TEXT & ~filters.COMMAND, nhan_ten)],
+            CHON_TUAN: [MessageHandler(filters.TEXT & ~filters.COMMAND, nhan_tuan)],
+            NHAP_CA:   [MessageHandler(filters.TEXT & ~filters.COMMAND, nhan_ca)],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -297,7 +382,7 @@ def main():
     conv_lichtoi = ConversationHandler(
         entry_points=[CommandHandler('lichtoi', lichtoi)],
         states={
-            CHON_TEN: [MessageHandler(filters.TEXT & ~filters.COMMAND, lichtoi_nhan_ten)],
+            LICHTOI_TEN: [MessageHandler(filters.TEXT & ~filters.COMMAND, lichtoi_nhan_ten)],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -305,7 +390,7 @@ def main():
     conv_huy = ConversationHandler(
         entry_points=[CommandHandler('huydangky', huydangky)],
         states={
-            CHON_TEN: [MessageHandler(filters.TEXT & ~filters.COMMAND, huydangky_nhan_ten)],
+            LICHTOI_TEN: [MessageHandler(filters.TEXT & ~filters.COMMAND, huydangky_nhan_ten)],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
