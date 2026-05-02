@@ -320,15 +320,8 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
          XEM LỊCH TRỰC
     ════════════════════════════ -->
     <div class="view" id="view-view-schedule">
-      <!-- Nếu chưa login → lock screen -->
-      <div id="vs-lock" class="lock-screen" style="display:none">
-        <div class="lock-icon">🔒</div>
-        <div class="lock-title">Chỉ Admin mới xem được lịch trực</div>
-        <div class="lock-sub">Đăng nhập bằng mật khẩu admin để xem và chỉnh sửa lịch chính thức.</div>
-        <button class="btn btn-primary" onclick="openLoginModal('view-schedule')">Đăng nhập Admin</button>
-      </div>
-      <!-- Nếu đã login -->
-      <div id="vs-content" style="display:none">
+     
+      <div id="vs-content">
         <div class="flex-between mb20">
           <div><div class="page-title">Lịch trực chính thức</div><div class="page-sub" style="margin-bottom:0">Lịch đã xếp. PT không hiện. Chỉ Admin chỉnh sửa.</div></div>
           <button class="btn btn-amber" onclick="toggleEdit()" id="edit-toggle-btn">✏️ Chỉnh sửa lịch</button>
@@ -629,10 +622,7 @@ function go(v){
   document.getElementById('bc-title').textContent = BC[v]||v;
 
   // Lock-screen views
-  if(v==='view-schedule'){
-    document.getElementById('vs-lock').style.display    = isAdmin?'none':'flex';
-    document.getElementById('vs-content').style.display = isAdmin?'block':'none';
-  }
+ 
   if(v==='history'){
     document.getElementById('hist-lock').style.display    = isAdmin?'none':'flex';
     document.getElementById('hist-content').style.display = isAdmin?'block':'none';
