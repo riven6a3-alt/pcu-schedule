@@ -241,7 +241,22 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
     <div class="view active" id="view-register">
       <div class="page-title">Đăng ký ca rảnh</div>
       <div class="page-sub">Chọn tên để xem các ca theo mảng bạn phụ trách và tick ca rảnh.</div>
-      <div id="reg-pick">
+      <!-- Bước 0: nhập mật khẩu nhân viên -->
+<div id="reg-lock">
+  <div class="card" style="max-width:420px;margin:60px auto;">
+    <div class="card-header"><span class="card-title">🔑 Xác nhận danh tính</span></div>
+    <div class="card-body">
+      <p style="font-size:14px;color:var(--text2);margin-bottom:16px;">Nhập mật khẩu nhân viên để tiếp tục đăng ký ca rảnh.</p>
+      <div class="form-group">
+        <label class="form-label">Mật khẩu</label>
+        <input type="password" class="form-input" id="staff-pass-input" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')checkStaffPass()">
+      </div>
+      <div id="staff-pass-err" style="color:var(--red);font-size:13px;display:none;margin-bottom:8px">❌ Mật khẩu không đúng</div>
+      <button class="btn btn-primary" style="width:100%" onclick="checkStaffPass()">Xác nhận</button>
+    </div>
+  </div>
+</div>
+      <div id="reg-pick" style="display:none">
         <div class="card">
           <div class="card-header"><span class="card-title">👤 Bạn là ai?</span><span style="font-size:13px;color:var(--text2)">Hiển thị ca theo mảng của bạn</span></div>
           <div class="card-body"><div class="staff-grid" id="staff-pick-grid"></div></div>
@@ -404,6 +419,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 <script>
 // ── CONSTANTS ──
 var ADMIN_PASS = 'pcu2026admin';
+var STAFF_PASS = 'pcu2026nv';
 var DAYS_S = ['T2','T3','T4','T5','T6','T7','CN'];
 var DAYS_F = ['Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy','Chủ Nhật'];
 var DL = {xld:'XLĐ',robux:'Robux',giftcard:'Gift Card'};
@@ -550,6 +566,15 @@ function doLogout(){
   go('register'); toast('Đã đăng xuất','info');
 }
 
+function checkStaffPass(){
+  var pass = document.getElementById('staff-pass-input').value;
+  if(pass === STAFF_PASS){
+    document.getElementById('reg-lock').style.display='none';
+    document.getElementById('reg-pick').style.display='block';
+  } else {
+    document.getElementById('staff-pass-err').style.display='block';
+  }
+}
 // ── ĐĂNG KÝ ──
 function buildPickGrid(){
   document.getElementById('staff-pick-grid').innerHTML=staffData.map(function(s){
